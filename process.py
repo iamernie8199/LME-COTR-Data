@@ -97,22 +97,18 @@ if __name__ == "__main__":
 
     for i in range(len(name_and_key)):
         name = list(name_and_key.keys())[i]
-        # cur.execute(f"SELECT max(date) from api_lme_cotr where contract = '{name_and_key[name]}'")
         if contract_df.empty:
             latest = datetime.date(2018, 1, 1)
         else:
             latest = contract_df[contract_df.contract == name_and_key[name]]['date'].values[0]
         file_list = get_file_name(name)
-
-        print(name_and_key[name], latest)
-        for row in range(len(file_list)):
-            check = file_list[0].split('-')[-3].split('/', 1)[-1]
-            if datetime.datetime.strptime(check, "%Y/%M/%d").date() == latest:
-                break
-            file_date = file_list[-1 - row].split('-')[-3].split('/', 1)[-1]
-            if datetime.datetime.strptime(file_date, "%Y/%M/%d").date() > latest:
-                file_path = Download(file_list[-1 - row])
-                df = process(file_path, col_dict)
-                if df['contract'][0] == name_and_key[name]:
-                    df.to_sql('api_lme_cotr', engine, index=False, if_exists='append')
-                os.remove(file_path)
+        check = file_list[0].split('-')[-3].split('/', 1)[-1]
+        if datetime.datetime.strptime(check, "%Y/%M/%d").date() > latest:
+            for row in range(len(file_list)):
+                file_date = file_list[-1 - row].split('-')[-3].split('/', 1)[-1]
+                if datetime.datetime.strptime(file_date, "%Y/%M/%d").date() > latest:
+                    file_path = Download(file_list[-1 - row])
+                    df = process(file_path, col_dict)
+                    if df['contract'][0] == name_and_key[name]:
+                        df.to_sql('api_lme_cotr', engine, index=False, if_exists='append')
+                    os.remove(file_path)
