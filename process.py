@@ -98,9 +98,10 @@ if __name__ == "__main__":
     for i in range(len(name_and_key)):
         name = list(name_and_key.keys())[i]
         # cur.execute(f"SELECT max(date) from api_lme_cotr where contract = '{name_and_key[name]}'")
-        latest = contract_df[contract_df.contract == name_and_key[name]]['date'].values[0]
-        if latest is None:
+        if contract_df.empty:
             latest = datetime.date(2018, 1, 1)
+        else:
+            latest = contract_df[contract_df.contract == name_and_key[name]]['date'].values[0]
         file_list = get_file_name(name)
 
         print(name_and_key[name], latest)
