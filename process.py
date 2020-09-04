@@ -1,14 +1,15 @@
 import datetime
 import json
 import os
+from math import ceil
 
 import pandas as pd
 import psycopg2
 import requests
-from math import ceil
 from bs4 import BeautifulSoup
-from sqlalchemy import create_engine
 from numpy import nan
+from sqlalchemy import create_engine
+from tqdm import trange
 
 from col_and_connodity_name import col_dict, name_and_key
 from config import pg_config
@@ -25,6 +26,7 @@ def connectDb():
 
 
 def get_file_name(metal_name):
+    files = list()
     try:
         r = requests.get(
             'https://www.lme.com/en-GB/Market-Data/Reports-and-data/Commitments-of-traders/' + metal_name)
@@ -34,7 +36,6 @@ def get_file_name(metal_name):
         metal_url = 'https://www.lme.com/api/Lists/DownloadLinks/' + hash_str
         r = requests.get(metal_url)
         js = json.loads(r.text)
-        files = list()
         for page_idx in range(ceil(js['total_items'] / 10)):
             url = metal_url + '?currentPage=' + str(page_idx)
             r = requests.get(url)
@@ -46,7 +47,6 @@ def get_file_name(metal_name):
             'https://www.lme.com/Market-Data/Reports-and-data/Commitments-of-traders/' + metal_name)
         soup = BeautifulSoup(r.text, 'html.parser')
         temp = soup.find('ul', {'class': 'download-list'})
-        files = list()
         a_tags = temp.find_all('a')
         for tag in a_tags:
             a = tag.get('href')
@@ -55,7 +55,7 @@ def get_file_name(metal_name):
     return files
 
 
-def Download(name):
+def download(name):
     url = "https://www.lme.com" + name
     resp = requests.get(url)
 
@@ -73,6 +73,7 @@ def process(filename, dict):
     df = df[8:].drop(['London Metal Exchange', 'Unnamed: 1', 'Unnamed: 2'], axis=1).reset_index(drop=True)
     tmp = 0
     data = {'date': date, 'contract': contract}
+
     for j in range(11):
         for i in df.columns.values.tolist():
             if tmp >= 90 and tmp % 2:
@@ -85,30 +86,36 @@ def process(filename, dict):
     return d
 
 
+def parse_date(w):
+    return w.split('-')[-3].split('/', 1)[-1]
+
+
 if __name__ == "__main__":
     conn = connectDb()
     cur = conn.cursor()
     cur.execute(create_LME_cotr_table_cmd)
     conn.commit()
     engine = create_engine('postgres://' + pg_config['user'] + ':' +
-                           pg_config['password'] + '@' + pg_config['host'] + ':' +
-                           str(pg_config['port']) + '/' + pg_config['dbname'])
+                           pg_config['password'] + '@' +
+                           pg_config['host'] + ':' +
+                           str(pg_config['port']) + '/' +
+                           pg_config['dbname'])
     sql = "SELECT contract, max(date) as date from api_lme_cotr GROUP BY contract;"
     contract_df = pd.read_sql(sql, conn)
 
-    for i in range(len(name_and_key)):
+    for i in trange(len(name_and_key)):
         name = list(name_and_key.keys())[i]
         if contract_df.empty:
             latest = datetime.date(2018, 1, 1)
         else:
             latest = contract_df[contract_df.contract == name_and_key[name]]['date'].values[0]
         file_list = get_file_name(name)
-        check = file_list[0].split('-')[-3].split('/', 1)[-1]
+        check = parse_date(file_list[0])
         if datetime.datetime.strptime(check, "%Y/%M/%d").date() > latest:
             for row in range(len(file_list)):
-                file_date = file_list[-1 - row].split('-')[-3].split('/', 1)[-1]
+                file_date = parse_date(file_list[-1 - row])
                 if datetime.datetime.strptime(file_date, "%Y/%M/%d").date() > latest:
-                    file_path = Download(file_list[-1 - row])
+                    file_path = download(file_list[-1 - row])
                     df = process(file_path, col_dict)
                     if df['contract'][0] == name_and_key[name]:
                         df.to_sql('api_lme_cotr', engine, index=False, if_exists='append')
