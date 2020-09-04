@@ -8,6 +8,7 @@ import requests
 from math import ceil
 from bs4 import BeautifulSoup
 from sqlalchemy import create_engine
+from numpy import nan
 
 from col_and_connodity_name import col_dict, name_and_key
 from config import pg_config
@@ -78,7 +79,7 @@ def process(filename, dict):
                 tmp += 1
                 continue
             else:
-                data[dict[str(tmp)]] = df[i][j]
+                data[dict[str(tmp)]] = df[i][j] if df[i][j] != '.' else nan
                 tmp += 1
     d = pd.DataFrame([data])
     return d
