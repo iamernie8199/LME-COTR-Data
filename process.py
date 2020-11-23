@@ -111,10 +111,10 @@ if __name__ == "__main__":
             latest = contract_df[contract_df.contract == name_and_key[name]]['date'].values[0]
         file_list = get_file_name(name)
         check = parse_date(file_list[0])
-        if datetime.datetime.strptime(check, "%Y/%M/%d").date() > latest:
+        if datetime.datetime.strptime(check, "%Y/%m/%d").date() > latest:
             for row in range(len(file_list)):
                 file_date = parse_date(file_list[-1 - row])
-                if datetime.datetime.strptime(file_date, "%Y/%M/%d").date() > latest:
+                if datetime.datetime.strptime(file_date, "%Y/%m/%d").date() > latest:
                     file_path = download(file_list[-1 - row])
                     df = process(file_path, col_dict)
                     if df['contract'][0] == name_and_key[name]:
